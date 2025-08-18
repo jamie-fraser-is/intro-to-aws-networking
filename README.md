@@ -1,11 +1,14 @@
+
 # Introduction to AWS Networking
 
-This repository contains CloudFormation templates and resources to help you deploy and experiment with core AWS networking components, including VPCs, subnets, route tables, NAT gateways, VPC endpoints, security groups, NACLs, Lambda, and more.
+This repository contains AWS CloudFormation templates and resources to help you deploy and experiment with core AWS networking components, including VPCs, subnets, route tables, NAT gateways, VPC endpoints, security groups, NACLs, Lambda, and more.
+
 
 ## Repository Structure
 
 - `examples/vpc-template.yaml`: Core network and VPC configuration.
 - `examples/tgw-template.yaml`: Template for deploying a Transit Gateway (TGW) and related resources. Deploy this first if you want to use the TGW attachment in the VPC template.
+
 
 ## Prerequisites
 
@@ -15,6 +18,9 @@ This repository contains CloudFormation templates and resources to help you depl
   - `AWS_ACCESS_KEY_ID`
   - `AWS_SECRET_ACCESS_KEY`
   - (Optional) `AWS_SESSION_TOKEN` if using temporary credentials
+
+> **Note:** If you clone this repository for personal or organisational use, it is strongly recommended to add branch protection policies to your repository. This helps to safeguard your main branch and maintain code quality.
+
 
 
 ## Deployment Steps
@@ -54,7 +60,8 @@ This repository contains CloudFormation templates and resources to help you depl
 5. **Check outputs:**
    - The stack will output resource IDs for VPC, subnets, NAT Gateway, Lambda, etc. Use these for integration or further automation.
 
-## Customization
+
+## Customisation
 
 - **IAM Roles:**
   - Replace the placeholder Lambda execution role ARN with one from your account that has the necessary permissions (VPC access, logging, etc).
@@ -63,13 +70,13 @@ This repository contains CloudFormation templates and resources to help you depl
 - **Parameters:**
   - Change CIDR blocks, subnet sizes, and naming to fit your network plan.
 
-## Cleanup
+## Clean up
 
 To avoid ongoing AWS charges, delete the CloudFormation stack when finished:
 ```sh
 aws cloudformation delete-stack --stack-name my-vpc-stack
 ```
 
-## License
+## Licence
 
 See [LICENSE](../LICENSE) for details.
