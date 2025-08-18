@@ -22,7 +22,7 @@ Parameters:
   
 Resources:
 
-  # Core VPC and networking components
+  ## Core VPC and networking components ##
 
   VPC:
     Type: AWS::EC2::VPC
@@ -237,7 +237,7 @@ Resources:
     Metadata:
       Comment: Associates PrivateSubnet2 with PrivateRouteTable
 
-  # VPC Endpoints for S3 and Lambda
+  ## VPC Endpoints for S3 and Lambda ##
 
   S3VPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -281,7 +281,128 @@ Resources:
     Metadata:
       Comment: Creates an interface VPC endpoint for Lambda
 
-  # Private Hosted Zone for internal DNS resolution
+  ## Example Network ACL for private subnets ##
+
+  PrivateSubnetNACL:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PrivateSubnetNACL
+    Metadata:
+      Comment: Example NACL for private subnets
+
+  PrivateSubnetNACLEntryInboundAllow:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PrivateSubnetNACL
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 0.0.0.0/0
+    Metadata:
+      Comment: Allow all inbound (example only, restrict in production)
+
+  PrivateSubnetNACLEntryOutboundAllow:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PrivateSubnetNACL
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 0.0.0.0/0
+    Metadata:
+      Comment: Allow all outbound (example only, restrict in production)
+
+  PrivateSubnet1NACLAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      NetworkAclId: !Ref PrivateSubnetNACL
+    Metadata:
+      Comment: Associate NACL with PrivateSubnet1
+
+  PrivateSubnet2NACLAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      NetworkAclId: !Ref PrivateSubnetNACL
+    Metadata:
+      Comment: Associate NACL with PrivateSubnet2
+
+  ## Example Security Group for Lambda function ##
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda in VPC
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: LambdaSG
+    Metadata:
+      Comment: Example SG for Lambda, restrict as needed
+
+  ## Example Security Group for general use ##
+
+  ExampleSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Example security group
+      VpcId: !Ref VPC
+      SecurityGroupIngress: []
+      SecurityGroupEgress: []
+      Tags:
+        - Key: Name
+          Value: ExampleSG
+    Metadata:
+      Comment: Placeholder for additional security group rules
+
+  ## Lambda function deployed in VPC mode ##
+  # This function is an example of how to deploy a Lambda function in VPC mode  
+
+  ExampleLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ExampleVpcLambda
+      Handler: index.handler
+      Role: arn:aws:iam::123456789012:role/lambda-vpc-role  # Replace with your Lambda execution role ARN
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              return {"statusCode": 200, "body": "Hello from Lambda in VPC!"}
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          EXAMPLE: "true"
+      Tags:
+        - Key: Name
+          Value: ExampleVpcLambda
+    Metadata:
+      Comment: Example Lambda function deployed in VPC mode with SG and private subnets
+
+  ## Private Hosted Zone for internal DNS resolution ##
 
   PrivateHostedZone:
     Type: AWS::Route53::HostedZone
@@ -298,7 +419,7 @@ Resources:
       Comment: Creates a private hosted zone named 'networking.aws' and associates
         it with the VPC
 
-  # Transit Gateway Attachment to connect VPC to TGW
+  ## Transit Gateway Attachment to connect VPC to TGW ##
 
   VPCTransitGatewayAttachment:
     Type: AWS::EC2::TransitGatewayAttachment
