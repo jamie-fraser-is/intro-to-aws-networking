@@ -6,8 +6,9 @@ This repository contains AWS CloudFormation templates and resources to help you 
 
 ## Repository Structure
 
-- `examples/vpc-template.yaml`: Core network and VPC configuration.
-- `examples/tgw-template.yaml`: Template for deploying a Transit Gateway (TGW) and related resources. Deploy this first if you want to use the TGW attachment in the VPC template.
+- `templates/tgw-template.yaml`: Standalone Transit Gateway (TGW) stack. Deploys a TGW and exports its ID for use by other stacks.
+- `templates/vpc-template.yaml`: Core network and VPC configuration. Deploys a VPC, subnets, NAT Gateway, endpoints, and attaches to the TGW using the output from `tgw-template.yaml`.
+- `templates/alb-ecs-template.yaml`: Application Load Balancer and ECS Fargate service, referencing VPC and subnet outputs from `vpc-template.yaml`.
 
 
 ## Prerequisites
@@ -34,31 +35,30 @@ This repository contains AWS CloudFormation templates and resources to help you 
 2. **Review and edit parameters:**
    - Open the template YAML files and adjust parameter defaults (e.g., CIDR blocks, subnet sizes) as needed for your environment.
    - For Lambda deployment, update the `Role` property in the Lambda function resource to use a valid IAM role ARN from your AWS account.
-   - If using the Transit Gateway attachment, ensure you have a TGW created and exported as `TransitGatewayId`.
+   - The templates are designed for automated deployment and cross-stack referencing. No manual parameter input is required for stack dependencies if you use the provided workflow and stack names.
 
 
-3. **Deploy the template:**
-   - Using AWS CLI:
+3. **Deploy the templates in order:**
+   - Using AWS CLI (recommended stack names):
      ```sh
-     aws cloudformation deploy --template-file vpc-template.yaml --stack-name my-vpc-stack --capabilities CAPABILITY_NAMED_IAM
+     aws cloudformation deploy --template-file templates/tgw-template.yaml --stack-name tgw-stack --capabilities CAPABILITY_NAMED_IAM
+     aws cloudformation deploy --template-file templates/vpc-template.yaml --stack-name network-stack --capabilities CAPABILITY_NAMED_IAM
+     aws cloudformation deploy --template-file templates/alb-ecs-template.yaml --stack-name alb-ecs-stack --capabilities CAPABILITY_NAMED_IAM
      ```
-   - Or use the AWS Console to upload and launch the template.
-   - If you want to use the Transit Gateway attachment, deploy `tgw-template.yaml` first, then deploy `vpc-template.yaml`.
+   - Or use the AWS Console to upload and launch the templates in the same order.
 
-4. **(Optional) Deploy using GitHub Actions:**
-   - This repository includes a GitHub Actions workflow to automate CloudFormation deployments.
+4. **(Recommended) Deploy using GitHub Actions:**
+   - This repository includes a GitHub Actions workflow to automate CloudFormation deployments in the correct order.
    - The workflow will:
-     - Check out your code on push or pull request.
-     - Set up AWS credentials from repository secrets.
-     - Validate the CloudFormation templates.
-     - Deploy the specified template (e.g., `vpc-template.yaml`) to your AWS account using the AWS CLI.
+     - Lint all templates.
+     - Deploy the TGW stack (`tgw-stack`), then the VPC stack (`network-stack`), then the ALB/ECS stack (`alb-ecs-stack`).
+     - Use fixed stack names so all cross-stack references work automatically.
    - To use this pipeline:
      1. Add your AWS credentials as repository secrets (see Prerequisites above).
-     2. Edit the workflow file (in `.github/workflows/`) to specify the correct template and stack name if needed.
-     3. Push your changes to trigger the workflow.
+     2. Push your changes to trigger the workflow.
 
 5. **Check outputs:**
-   - The stack will output resource IDs for VPC, subnets, NAT Gateway, Lambda, etc. Use these for integration or further automation.
+   - Each stack will output resource IDs (e.g., TGW ID, VPC ID, subnet IDs, ALB DNS name, ECS service name) for integration or further automation. Outputs are exported for cross-stack referencing.
 
 
 ## Customisation

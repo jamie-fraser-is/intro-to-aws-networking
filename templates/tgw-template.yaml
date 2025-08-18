@@ -19,4 +19,4 @@ Outputs:
     Description: Transit Gateway ID
     Value: !Ref TransitGateway
     Export:
-      Name: TransitGatewayId
+      Name: !Sub "${AWS::StackName}-TransitGatewayId"
