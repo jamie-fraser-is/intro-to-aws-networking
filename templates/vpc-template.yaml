@@ -1,0 +1,433 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: VPC with public/private subnets, IGW, NAT Gateway, route tables, VPC
+  endpoints, and a private hosted zone
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnet1Cidr:
+    Type: String
+    Default: 10.0.1.0/24
+  PublicSubnet2Cidr:
+    Type: String
+    Default: 10.0.2.0/24
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: 10.0.101.0/24
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: 10.0.102.0/24
+  
+Resources:
+
+  ## Core VPC and networking components ##
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock:
+        Ref: VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: BasicVPC
+    Metadata:
+      Comment: Creates the main VPC with DNS support
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: BasicIGW
+    Metadata:
+      Comment: Creates an Internet Gateway for public internet access
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId:
+        Ref: VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+    Metadata:
+      Comment: Attaches the Internet Gateway to the VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock:
+        Ref: PublicSubnet1Cidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Name
+        Value: PublicSubnet1
+    Metadata:
+      Comment: Creates the first public subnet in AZ1
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock:
+        Ref: PublicSubnet2Cidr
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Name
+        Value: PublicSubnet2
+    Metadata:
+      Comment: Creates the second public subnet in AZ2
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock:
+        Ref: PrivateSubnet1Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Name
+        Value: PrivateSubnet1
+    Metadata:
+      Comment: Creates the first private subnet in AZ1
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock:
+        Ref: PrivateSubnet2Cidr
+      MapPublicIpOnLaunch: false
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Name
+        Value: PrivateSubnet2
+    Metadata:
+      Comment: Creates the second private subnet in AZ2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: PublicRouteTable
+    Metadata:
+      Comment: Creates a route table for public subnets
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+    Metadata:
+      Comment: Adds a default route to the Internet Gateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet1
+      RouteTableId:
+        Ref: PublicRouteTable
+    Metadata:
+      Comment: Associates PublicSubnet1 with PublicRouteTable
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PublicSubnet2
+      RouteTableId:
+        Ref: PublicRouteTable
+    Metadata:
+      Comment: Associates PublicSubnet2 with PublicRouteTable
+
+  EIPNatGateway:
+    Type: AWS::EC2::EIP
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+    Metadata:
+      Comment: Allocates an Elastic IP for the NAT Gateway
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: AttachGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+        - EIPNatGateway
+        - AllocationId
+      SubnetId:
+        Ref: PublicSubnet1
+      Tags:
+      - Key: Name
+        Value: BasicNATGateway
+    Metadata:
+      Comment: Creates a NAT Gateway for private subnet internet access
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+      Tags:
+      - Key: Name
+        Value: PrivateRouteTable
+    Metadata:
+      Comment: Creates a route table for private subnets
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NatGateway
+    Metadata:
+      Comment: Adds a default route to the NAT Gateway
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet1
+      RouteTableId:
+        Ref: PrivateRouteTable
+    Metadata:
+      Comment: Associates PrivateSubnet1 with PrivateRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnet2
+      RouteTableId:
+        Ref: PrivateRouteTable
+    Metadata:
+      Comment: Associates PrivateSubnet2 with PrivateRouteTable
+
+  ## VPC Endpoints for S3 and Lambda ##
+
+  S3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPC
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.s3
+      VpcEndpointType: Gateway
+      RouteTableIds:
+      - Ref: PrivateRouteTable
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action: '*'
+          Resource: '*'
+      Tags:
+      - Key: Name
+        Value: S3VPCEndpoint
+    Metadata:
+      Comment: Creates a gateway VPC endpoint for S3
+
+  LambdaVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId:
+        Ref: VPC
+      ServiceName:
+        Fn::Sub: com.amazonaws.${AWS::Region}.lambda
+      VpcEndpointType: Interface
+      SubnetIds:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      SecurityGroupIds: []
+      PrivateDnsEnabled: true
+      Tags:
+      - Key: Name
+        Value: LambdaVPCEndpoint
+    Metadata:
+      Comment: Creates an interface VPC endpoint for Lambda
+
+  ## Example Network ACL for private subnets ##
+
+  PrivateSubnetNACL:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: PrivateSubnetNACL
+    Metadata:
+      Comment: Example NACL for private subnets
+
+  PrivateSubnetNACLEntryInboundAllow:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PrivateSubnetNACL
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 0.0.0.0/0
+    Metadata:
+      Comment: Allow all inbound (example only, restrict in production)
+
+  PrivateSubnetNACLEntryOutboundAllow:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref PrivateSubnetNACL
+      RuleNumber: 100
+      Protocol: -1
+      RuleAction: allow
+      Egress: true
+      CidrBlock: 0.0.0.0/0
+    Metadata:
+      Comment: Allow all outbound (example only, restrict in production)
+
+  PrivateSubnet1NACLAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      NetworkAclId: !Ref PrivateSubnetNACL
+    Metadata:
+      Comment: Associate NACL with PrivateSubnet1
+
+  PrivateSubnet2NACLAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      NetworkAclId: !Ref PrivateSubnetNACL
+    Metadata:
+      Comment: Associate NACL with PrivateSubnet2
+
+  ## Example Security Group for Lambda function ##
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda in VPC
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: LambdaSG
+    Metadata:
+      Comment: Example SG for Lambda, restrict as needed
+
+  ## Example Security Group for general use ##
+
+  ExampleSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Example security group
+      VpcId: !Ref VPC
+      SecurityGroupIngress: []
+      SecurityGroupEgress: []
+      Tags:
+        - Key: Name
+          Value: ExampleSG
+    Metadata:
+      Comment: Placeholder for additional security group rules
+
+  ## Lambda function deployed in VPC mode ##
+  # This function is an example of how to deploy a Lambda function in VPC mode  
+
+  ExampleLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ExampleVpcLambda
+      Handler: index.handler
+      Role: arn:aws:iam::123456789012:role/lambda-vpc-role  # Replace with your Lambda execution role ARN
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              return {"statusCode": 200, "body": "Hello from Lambda in VPC!"}
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          EXAMPLE: "true"
+      Tags:
+        - Key: Name
+          Value: ExampleVpcLambda
+    Metadata:
+      Comment: Example Lambda function deployed in VPC mode with SG and private subnets
+
+  ## Private Hosted Zone for internal DNS resolution ##
+
+  PrivateHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: networking.aws
+      HostedZoneConfig:
+        Comment: Private hosted zone for internal DNS resolution
+      VPCs:
+      - VPCId:
+          Ref: VPC
+        VPCRegion:
+          Ref: AWS::Region
+    Metadata:
+      Comment: Creates a private hosted zone named 'networking.aws' and associates
+        it with the VPC
+
+  ## Transit Gateway Attachment to connect VPC to TGW ##
+
+  VPCTransitGatewayAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !ImportValue TransitGatewayId
+      VpcId: !Ref VPC
+      SubnetIds:
+        - !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: VPCtoTGWAttachment
