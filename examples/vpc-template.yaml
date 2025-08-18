@@ -289,15 +289,11 @@ Resources:
       Name: networking.aws
       HostedZoneConfig:
         Comment: Private hosted zone for internal DNS resolution
-        PrivateZone: true
       VPCs:
       - VPCId:
           Ref: VPC
         VPCRegion:
           Ref: AWS::Region
-      Tags:
-      - Key: Name
-        Value: PrivateHostedZone
     Metadata:
       Comment: Creates a private hosted zone named 'networking.aws' and associates
         it with the VPC
