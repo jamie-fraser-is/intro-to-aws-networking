@@ -1,6 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
+
 Description: VPC with public/private subnets, IGW, NAT Gateway, route tables, VPC
   endpoints, and a private hosted zone
+
 Parameters:
   VpcCidr:
     Type: String
@@ -17,7 +19,11 @@ Parameters:
   PrivateSubnet2Cidr:
     Type: String
     Default: 10.0.102.0/24
+  
 Resources:
+
+  # Core VPC and networking components
+
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -30,6 +36,7 @@ Resources:
         Value: BasicVPC
     Metadata:
       Comment: Creates the main VPC with DNS support
+
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -38,6 +45,7 @@ Resources:
         Value: BasicIGW
     Metadata:
       Comment: Creates an Internet Gateway for public internet access
+
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
@@ -47,6 +55,7 @@ Resources:
         Ref: InternetGateway
     Metadata:
       Comment: Attaches the Internet Gateway to the VPC
+
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -64,6 +73,7 @@ Resources:
         Value: PublicSubnet1
     Metadata:
       Comment: Creates the first public subnet in AZ1
+
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -81,6 +91,7 @@ Resources:
         Value: PublicSubnet2
     Metadata:
       Comment: Creates the second public subnet in AZ2
+
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -98,6 +109,7 @@ Resources:
         Value: PrivateSubnet1
     Metadata:
       Comment: Creates the first private subnet in AZ1
+
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -115,6 +127,7 @@ Resources:
         Value: PrivateSubnet2
     Metadata:
       Comment: Creates the second private subnet in AZ2
+
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -125,6 +138,7 @@ Resources:
         Value: PublicRouteTable
     Metadata:
       Comment: Creates a route table for public subnets
+
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
@@ -136,6 +150,7 @@ Resources:
         Ref: InternetGateway
     Metadata:
       Comment: Adds a default route to the Internet Gateway
+
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -145,6 +160,7 @@ Resources:
         Ref: PublicRouteTable
     Metadata:
       Comment: Associates PublicSubnet1 with PublicRouteTable
+
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -154,6 +170,7 @@ Resources:
         Ref: PublicRouteTable
     Metadata:
       Comment: Associates PublicSubnet2 with PublicRouteTable
+
   EIPNatGateway:
     Type: AWS::EC2::EIP
     DependsOn: AttachGateway
@@ -161,6 +178,7 @@ Resources:
       Domain: vpc
     Metadata:
       Comment: Allocates an Elastic IP for the NAT Gateway
+
   NatGateway:
     Type: AWS::EC2::NatGateway
     DependsOn: AttachGateway
@@ -176,6 +194,7 @@ Resources:
         Value: BasicNATGateway
     Metadata:
       Comment: Creates a NAT Gateway for private subnet internet access
+
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -186,6 +205,7 @@ Resources:
         Value: PrivateRouteTable
     Metadata:
       Comment: Creates a route table for private subnets
+
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
@@ -196,6 +216,7 @@ Resources:
         Ref: NatGateway
     Metadata:
       Comment: Adds a default route to the NAT Gateway
+
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -205,6 +226,7 @@ Resources:
         Ref: PrivateRouteTable
     Metadata:
       Comment: Associates PrivateSubnet1 with PrivateRouteTable
+
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -214,6 +236,9 @@ Resources:
         Ref: PrivateRouteTable
     Metadata:
       Comment: Associates PrivateSubnet2 with PrivateRouteTable
+
+  # VPC Endpoints for S3 and Lambda
+
   S3VPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -236,6 +261,7 @@ Resources:
         Value: S3VPCEndpoint
     Metadata:
       Comment: Creates a gateway VPC endpoint for S3
+
   LambdaVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -254,6 +280,9 @@ Resources:
         Value: LambdaVPCEndpoint
     Metadata:
       Comment: Creates an interface VPC endpoint for Lambda
+
+  # Private Hosted Zone for internal DNS resolution
+
   PrivateHostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
