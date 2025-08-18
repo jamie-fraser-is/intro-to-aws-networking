@@ -29,52 +29,52 @@ jobs:
             cfn-lint "$file"
           done
 
-  deploy:
-    name: Deploy CloudFormation Templates
-    runs-on: ubuntu-latest
-    needs: lint
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+  # deploy:
+  #   name: Deploy CloudFormation Templates
+  #   runs-on: ubuntu-latest
+  #   needs: lint
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v3
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-2
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v2
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: eu-west-2
 
-      - name: Deploy tgw-template.yaml first
-        run: |
-          if [ -f templates/tgw-template.yaml ]; then
-            echo "Deploying demo-stack-tgw-template from templates/tgw-template.yaml"
-            aws cloudformation deploy \
-              --template-file templates/tgw-template.yaml \
-              --stack-name demo-stack-tgw-template \
-              --capabilities CAPABILITY_NAMED_IAM
-          fi
+  #     - name: Deploy tgw-template.yaml first
+  #       run: |
+  #         if [ -f templates/tgw-template.yaml ]; then
+  #           echo "Deploying demo-stack-tgw-template from templates/tgw-template.yaml"
+  #           aws cloudformation deploy \
+  #             --template-file templates/tgw-template.yaml \
+  #             --stack-name demo-stack-tgw-template \
+  #             --capabilities CAPABILITY_NAMED_IAM
+  #         fi
 
-      - name: Deploy vpc-template.yaml after TGW
-        run: |
-          if [ -f templates/vpc-template.yaml ]; then
-            echo "Deploying demo-stack-vpc-template from templates/vpc-template.yaml"
-            aws cloudformation deploy \
-              --template-file templates/vpc-template.yaml \
-              --stack-name demo-stack-vpc-template \
-              --capabilities CAPABILITY_NAMED_IAM
-          fi
+  #     - name: Deploy vpc-template.yaml after TGW
+  #       run: |
+  #         if [ -f templates/vpc-template.yaml ]; then
+  #           echo "Deploying demo-stack-vpc-template from templates/vpc-template.yaml"
+  #           aws cloudformation deploy \
+  #             --template-file templates/vpc-template.yaml \
+  #             --stack-name demo-stack-vpc-template \
+  #             --capabilities CAPABILITY_NAMED_IAM
+  #         fi
 
-      - name: Deploy any other templates
-        run: |
-          for file in templates/*.yaml; do
-            base=$(basename "$file")
-            if [ "$base" != "tgw-template.yaml" ] && [ "$base" != "vpc-template.yaml" ]; then
-              stack_name="demo-stack-$(basename \"$file\" .yaml)"
-              echo "Deploying $stack_name from $file"
-              aws cloudformation deploy \
-                --template-file "$file" \
-                --stack-name "$stack_name" \
-                --capabilities CAPABILITY_NAMED_IAM
-            fi
-          done
+  #     - name: Deploy any other templates
+  #       run: |
+  #         for file in templates/*.yaml; do
+  #           base=$(basename "$file")
+  #           if [ "$base" != "tgw-template.yaml" ] && [ "$base" != "vpc-template.yaml" ]; then
+  #             stack_name="demo-stack-$(basename \"$file\" .yaml)"
+  #             echo "Deploying $stack_name from $file"
+  #             aws cloudformation deploy \
+  #               --template-file "$file" \
+  #               --stack-name "$stack_name" \
+  #               --capabilities CAPABILITY_NAMED_IAM
+  #           fi
+  #         done
