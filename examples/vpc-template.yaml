@@ -301,3 +301,16 @@ Resources:
     Metadata:
       Comment: Creates a private hosted zone named 'networking.aws' and associates
         it with the VPC
+
+  # Transit Gateway Attachment to connect VPC to TGW
+
+  VPCTransitGatewayAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !ImportValue TransitGatewayId
+      VpcId: !Ref VPC
+      SubnetIds:
+        - !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: VPCtoTGWAttachment
