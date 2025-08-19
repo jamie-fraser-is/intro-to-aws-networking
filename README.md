@@ -11,14 +11,17 @@ This repository contains AWS CloudFormation templates and resources to help you 
 - `templates/alb-ecs-template.yaml`: Application Load Balancer and ECS Fargate service, referencing VPC and subnet outputs from `vpc-template.yaml`.
 
 
+
 ## Prerequisites
 
 - An AWS account with permissions to create VPCs, subnets, IAM roles, Lambda functions, and related resources.
 - AWS CLI installed and configured, or access to the AWS Management Console.
-- If using the GitHub Actions pipeline, you must add your AWS credentials as GitHub repository secrets:
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
-  - (Optional) `AWS_SESSION_TOKEN` if using temporary credentials
+- **For GitHub Actions OIDC role-based deployments:**
+  1. Create an AWS IAM role for GitHub Actions OIDC federation ("OIDC role") with trust policy for GitHub's OIDC provider and permissions to assume the CloudFormation deployment role.
+  2. Create a separate AWS IAM role for CloudFormation deployments ("CloudFormation role") with permissions to create/update/delete the required AWS resources (including IAM roles, VPC, ECS, Lambda, etc). The OIDC role should be allowed to assume this role.
+  3. Add the following GitHub repository secrets:
+     - `AWS_OIDC_ROLE_ARN`: ARN of the OIDC role to be assumed by GitHub Actions.
+     - `AWS_CLOUDFORMATION_ROLE_ARN`: ARN of the CloudFormation deployment role to be used by the AWS CLI `--role-arn` flag.
 
 > **Note:** If you clone this repository for personal or organisational use, it is strongly recommended to add branch protection policies to your repository. This helps to safeguard your main branch and maintain code quality.
 
@@ -47,15 +50,18 @@ This repository contains AWS CloudFormation templates and resources to help you 
      ```
    - Or use the AWS Console to upload and launch the templates in the same order.
 
-4. **(Recommended) Deploy using GitHub Actions:**
-   - This repository includes a GitHub Actions workflow to automate CloudFormation deployments in the correct order.
+
+4. **(Recommended) Deploy using GitHub Actions (OIDC role-based):**
+   - This repository includes a GitHub Actions workflow to automate CloudFormation deployments in the correct order using OIDC and role-based access.
    - The workflow will:
      - Lint all templates.
-     - Deploy the TGW stack (`tgw-stack`), then the VPC stack (`network-stack`), then the ALB/ECS stack (`alb-ecs-stack`).
+     - Configure AWS credentials using the OIDC role (`AWS_OIDC_ROLE_ARN`).
+     - Deploy the TGW stack (`tgw-stack`), then the VPC stack (`network-stack`), then the ALB/ECS stack (`alb-ecs-stack`), each using the CloudFormation deployment role (`AWS_CLOUDFORMATION_ROLE_ARN`).
      - Use fixed stack names so all cross-stack references work automatically.
    - To use this pipeline:
-     1. Add your AWS credentials as repository secrets (see Prerequisites above).
-     2. Push your changes to trigger the workflow.
+     1. Set up the required OIDC and CloudFormation roles in AWS (see Prerequisites above).
+     2. Add the role ARNs as repository secrets (`AWS_OIDC_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`).
+     3. Push your changes to trigger the workflow.
 
 5. **Check outputs:**
    - Each stack will output resource IDs (e.g., TGW ID, VPC ID, subnet IDs, ALB DNS name, ECS service name) for integration or further automation. Outputs are exported for cross-stack referencing.
