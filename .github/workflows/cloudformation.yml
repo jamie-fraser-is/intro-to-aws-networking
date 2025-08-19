@@ -34,15 +34,17 @@ jobs:
   #   runs-on: ubuntu-latest
   #   needs: lint
   #   if: github.ref == 'refs/heads/main'
+  #   permissions:
+  #     id-token: write
+  #     contents: read
   #   steps:
   #     - name: Checkout repository
   #       uses: actions/checkout@v3
 
-  #     - name: Configure AWS credentials
+  #     - name: Configure AWS credentials via OIDC
   #       uses: aws-actions/configure-aws-credentials@v2
   #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
   #         aws-region: eu-west-2
 
   #     - name: Deploy TGW stack
@@ -50,18 +52,21 @@ jobs:
   #         aws cloudformation deploy \
   #           --template-file templates/tgw-template.yaml \
   #           --stack-name tgw-stack \
-  #           --capabilities CAPABILITY_NAMED_IAM
+  #           --capabilities CAPABILITY_NAMED_IAM \
+  #           --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
 
   #     - name: Deploy VPC stack
   #       run: |
   #         aws cloudformation deploy \
   #           --template-file templates/vpc-template.yaml \
   #           --stack-name network-stack \
-  #           --capabilities CAPABILITY_NAMED_IAM
+  #           --capabilities CAPABILITY_NAMED_IAM \
+  #           --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
 
   #     - name: Deploy ALB/ECS stack
   #       run: |
   #         aws cloudformation deploy \
   #           --template-file templates/alb-ecs-template.yaml \
   #           --stack-name alb-ecs-stack \
-  #           --capabilities CAPABILITY_NAMED_IAM
+  #           --capabilities CAPABILITY_NAMED_IAM \
+  #           --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
