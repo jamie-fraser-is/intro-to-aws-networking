@@ -47,13 +47,26 @@ jobs:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: eu-west-2
 
-      - name: Deploy TGW stack
+      - name: Show AWS caller identity
+        run: aws sts get-caller-identity
+
+      - name: Print environment variables
+        run: env | sort
+
+      - name: Simulate CloudFormation permissions
+        run: |
+          aws iam simulate-principal-policy \
+            --policy-source-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }} \
+            --action-names cloudformation:DescribeStacks
+
+      - name: Deploy TGW stack (debug)
         run: |
           aws cloudformation deploy \
             --template-file templates/tgw-template.yaml \
             --stack-name tgw-stack \
             --capabilities CAPABILITY_NAMED_IAM \
-            --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
+            --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }} \
+            --debug
 
   #     - name: Deploy VPC stack
   #       run: |
