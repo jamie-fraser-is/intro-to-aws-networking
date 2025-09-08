@@ -47,12 +47,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: eu-west-2
 
-      - name: Show AWS caller identity
-        run: aws sts get-caller-identity
-
-      - name: Print environment variables
-        run: env | sort
-
       - name: Simulate CloudFormation permissions
         run: |
           aws iam simulate-principal-policy \
@@ -68,18 +62,18 @@ jobs:
             --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }} \
             --debug
 
-  #     - name: Deploy VPC stack
-  #       run: |
-  #         aws cloudformation deploy \
-  #           --template-file templates/vpc-template.yaml \
-  #           --stack-name network-stack \
-  #           --capabilities CAPABILITY_NAMED_IAM \
-  #           --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
+      - name: Deploy VPC stack
+        run: |
+          aws cloudformation deploy \
+            --template-file templates/vpc-template.yaml \
+            --stack-name network-stack \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
 
-  #     - name: Deploy ALB/ECS stack
-  #       run: |
-  #         aws cloudformation deploy \
-  #           --template-file templates/alb-ecs-template.yaml \
-  #           --stack-name alb-ecs-stack \
-  #           --capabilities CAPABILITY_NAMED_IAM \
-  #           --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
+      - name: Deploy ALB/ECS stack
+        run: |
+          aws cloudformation deploy \
+            --template-file templates/alb-ecs-template.yaml \
+            --stack-name alb-ecs-stack \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
