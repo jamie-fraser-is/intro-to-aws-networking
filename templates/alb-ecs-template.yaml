@@ -63,6 +63,9 @@ Resources:
     Properties:
       DomainName: isjaftraining.aws
       ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: isjaftraining.aws
+          HostedZoneId: !Ref PublicHostedZone
       Tags:
         - Key: Name
           Value: ALBCertificate
