@@ -2,22 +2,15 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Deploys an Application Load Balancer (ALB) with an ECS Fargate backend service.
 
 Resources:
-  PublicHostedZone:
-    Type: AWS::Route53::HostedZone
-    Properties:
-      Name: isjaftraining.aws
-      HostedZoneConfig:
-        Comment: Public hosted zone for ALB domain
-
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for ALB (HTTPS only)
+      GroupDescription: Security group for ALB (HTTP only)
       VpcId: !ImportValue network-stack-VPCId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
+          FromPort: 80
+          ToPort: 80
           CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: -1
@@ -58,18 +51,6 @@ Resources:
         - Key: Name
           Value: ExampleALB
 
-  ALBCertificate:
-    Type: AWS::CertificateManager::Certificate
-    Properties:
-      DomainName: isjaftraining.aws
-      ValidationMethod: DNS
-      DomainValidationOptions:
-        - DomainName: isjaftraining.aws
-          HostedZoneId: !Ref PublicHostedZone
-      Tags:
-        - Key: Name
-          Value: ALBCertificate
-
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -77,10 +58,8 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBTargetGroup
       LoadBalancerArn: !Ref ALB
-      Port: 443
-      Protocol: HTTPS
-      Certificates:
-        - CertificateArn: !Ref ALBCertificate
+      Port: 80
+      Protocol: HTTP
 
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
