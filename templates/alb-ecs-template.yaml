@@ -70,16 +70,6 @@ Resources:
         - Key: Name
           Value: ALBCertificate
 
-  ALBCertificateValidationRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref PublicHostedZone
-      Name: !Select [0, !GetAtt ALBCertificate.DomainValidationOptions]
-      Type: CNAME
-      TTL: 300
-      ResourceRecords:
-        - !Select [1, !GetAtt ALBCertificate.DomainValidationOptions]
-
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
