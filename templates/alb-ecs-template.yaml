@@ -150,13 +150,154 @@ Resources:
           TargetGroupArn: !Ref ALBTargetGroup
       ServiceName: ExampleECSService
 
+  # Lambda execution role for VPC Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaVPCAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: LambdaExecutionRole
+
+  # Security group for Lambda in VPC
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda in VPC
+      VpcId: !ImportValue network-stack-VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: LambdaSG
+
+  # Example Lambda function deployed in VPC mode
+  ExampleLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ExampleVpcLambda
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              return {"statusCode": 200, "body": "Hello from Lambda in VPC!"}
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !ImportValue network-stack-PrivateSubnet1Id
+          - !ImportValue network-stack-PrivateSubnet2Id
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          EXAMPLE: "true"
+      Tags:
+        - Key: Name
+          Value: ExampleVpcLambda
+
+  # API Gateway REST API to expose Lambda function
+  LambdaApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ExampleLambdaApi
+      Description: Public API Gateway for ExampleVpcLambda
+
+  LambdaApiRootResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref LambdaApi
+      ParentId: !GetAtt LambdaApi.RootResourceId
+      PathPart: lambda
+
+  LambdaApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref LambdaApi
+      ResourceId: !Ref LambdaApiRootResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ExampleLambdaFunction.Arn}/invocations
+
+  LambdaApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: LambdaApiMethod
+    Properties:
+      RestApiId: !Ref LambdaApi
+      StageName: prod
+
+  LambdaApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ExampleLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${LambdaApi}/*/*/lambda
+
 Outputs:
   ALBEndpoint:
     Description: DNS name of the Application Load Balancer
     Value: !GetAtt ALB.DNSName
+  ALBSecurityGroupId:
+    Description: Security group ID for the ALB
+    Value: !Ref ALBSecurityGroup
   ECSClusterName:
     Description: Name of the ECS Cluster
     Value: !Ref ECSCluster
+  ECSClusterArn:
+    Description: ARN of the ECS Cluster
+    Value: !GetAtt ECSCluster.Arn
   ECSServiceName:
     Description: Name of the ECS Service
     Value: !Ref ECSService
+  ECSServiceTaskExecutionRoleArn:
+    Description: ARN of the ECS Task Execution Role
+    Value: !GetAtt ECSServiceTaskExecutionRole.Arn
+  ECSTaskRoleArn:
+    Description: ARN of the ECS Task Role
+    Value: !GetAtt ECSTaskRole.Arn
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref ExampleLambdaFunction
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt ExampleLambdaFunction.Arn
+  LambdaSecurityGroupId:
+    Description: Security group ID for Lambda
+    Value: !Ref LambdaSecurityGroup
+  LambdaApiInvokeUrl:
+    Description: Invoke URL for the Lambda API Gateway endpoint
+    Value:
+      Fn::Sub: https://${LambdaApi}.execute-api.${AWS::Region}.amazonaws.com/prod/lambda

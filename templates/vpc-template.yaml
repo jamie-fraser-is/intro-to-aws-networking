@@ -333,27 +333,6 @@ Resources:
     Metadata:
       Comment: Associate NACL with PrivateSubnet2
 
-  ## Example Security Group for Lambda function ##
-
-  LambdaSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for Lambda in VPC
-      VpcId: !Ref VPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: LambdaSG
-    Metadata:
-      Comment: Example SG for Lambda, restrict as needed
-
   ## Example Security Group for general use ##
 
   ExampleSecurityGroup:
@@ -368,65 +347,6 @@ Resources:
           Value: ExampleSG
     Metadata:
       Comment: Placeholder for additional security group rules
-
-  ## Lambda function deployed in VPC mode ##
-  # This function is an example of how to deploy a Lambda function in VPC mode  
-
-
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: LambdaVPCAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ec2:CreateNetworkInterface
-                  - ec2:DescribeNetworkInterfaces
-                  - ec2:DeleteNetworkInterface
-                Resource: '*'
-      Tags:
-        - Key: Name
-          Value: LambdaExecutionRole
-
-  ExampleLambdaFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: ExampleVpcLambda
-      Handler: index.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: python3.12
-      Code:
-        ZipFile: |
-          def handler(event, context):
-              return {"statusCode": 200, "body": "Hello from Lambda in VPC!"}
-      VpcConfig:
-        SecurityGroupIds:
-          - !Ref LambdaSecurityGroup
-        SubnetIds:
-          - !Ref PrivateSubnet1
-          - !Ref PrivateSubnet2
-      Timeout: 10
-      MemorySize: 128
-      Environment:
-        Variables:
-          EXAMPLE: "true"
-      Tags:
-        - Key: Name
-          Value: ExampleVpcLambda
-    Metadata:
-      Comment: Example Lambda function deployed in VPC mode with SG and private subnets
 
   ## Private Hosted Zone for internal DNS resolution ##
 
