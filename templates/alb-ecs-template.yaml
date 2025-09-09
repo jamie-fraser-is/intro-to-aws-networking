@@ -123,11 +123,10 @@ Resources:
       TaskRoleArn: !GetAtt ECSTaskRole.Arn
       ContainerDefinitions:
         - Name: app
-          Image: public.ecr.aws/amazonlinux/amazonlinux:latest
+          Image: nginx:latest
           Essential: true
           PortMappings:
             - ContainerPort: 80
-          Command: [ "/bin/sh", "-c", "echo '<h1>Hello from ECS Fargate!</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'" ]
 
   ECSService:
     Type: AWS::ECS::Service
