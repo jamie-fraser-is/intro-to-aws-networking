@@ -1,16 +1,12 @@
-
 # Introduction to AWS Networking
 
 This repository contains AWS CloudFormation templates and resources to help you deploy and experiment with core AWS networking components, including VPCs, subnets, route tables, NAT gateways, VPC endpoints, security groups, NACLs, Lambda, and more.
-
 
 ## Repository Structure
 
 - `templates/tgw-template.yaml`: Standalone Transit Gateway (TGW) stack. Deploys a TGW and exports its ID for use by other stacks.
 - `templates/vpc-template.yaml`: Core network and VPC configuration. Deploys a VPC, subnets, NAT Gateway, endpoints, and attaches to the TGW using the output from `tgw-template.yaml`.
 - `templates/alb-ecs-template.yaml`: Application Load Balancer and ECS Fargate service, referencing VPC and subnet outputs from `vpc-template.yaml`.
-
-
 
 ## Prerequisites
 
@@ -25,7 +21,118 @@ This repository contains AWS CloudFormation templates and resources to help you 
 
 > **Note:** If you clone this repository for personal or organisational use, it is strongly recommended to add branch protection policies to your repository. This helps to safeguard your main branch and maintain code quality.
 
+## OIDC & IAM Role Setup for GitHub Actions Deployment
 
+Follow these steps to securely enable GitHub Actions deployments to AWS using OIDC and least-privilege IAM roles.
+
+### 1. Create the GitHub OIDC Identity Provider in AWS
+
+1. Go to the IAM console > Identity providers > Add provider.
+2. Choose **Provider type**: `OpenID Connect`.
+3. Set **Provider URL**: `https://token.actions.githubusercontent.com`
+4. Set **Audience**: `sts.amazonaws.com`
+5. Click **Add provider**.
+
+### 2. Create the OIDC Role (GitHub Actions Assume Role)
+
+This role is assumed by GitHub Actions via OIDC and can assume the CloudFormation deployment role.
+
+**Trust policy JSON:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:<YOUR_GITHUB_ORG>/<YOUR_REPO>:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
+```
+- Replace `<YOUR_AWS_ACCOUNT_ID>`, `<YOUR_GITHUB_ORG>`, and `<YOUR_REPO>` as appropriate.
+- You can broaden the `sub` condition for more branches or workflows if needed.
+
+**Permissions policy:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<CloudFormationDeploymentRoleName>"
+    }
+  ]
+}
+```
+
+### 3. Create the CloudFormation Deployment Role
+
+This role is assumed by the OIDC role and used for all AWS resource creation.
+
+**Trust policy JSON:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<OIDCRoleName>"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+**Permissions policy (least privilege example):**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:*",
+        "ec2:*",
+        "iam:PassRole",
+        "iam:GetRole",
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "ecs:*",
+        "elasticloadbalancing:*",
+        "logs:*",
+        "lambda:*",
+        "route53:*",
+        "acm:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+- Restrict resources further for production use.
+
+### 4. Add Role ARNs to GitHub Secrets
+
+- `AWS_OIDC_ROLE_ARN`: ARN of the OIDC role (step 2)
+- `AWS_CLOUDFORMATION_ROLE_ARN`: ARN of the CloudFormation deployment role (step 3)
+
+Add these as repository secrets in GitHub Settings > Secrets and variables > Actions.
 
 ## Deployment Steps
 
