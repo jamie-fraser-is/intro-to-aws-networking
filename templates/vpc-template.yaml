@@ -449,14 +449,12 @@ Resources:
 
   VPCTransitGatewayAttachment:
     Type: AWS::EC2::TransitGatewayAttachment
-    DependsOn:
-      - PrivateSubnet1
-      - PrivateSubnet2
     Properties:
       TransitGatewayId: !ImportValue tgw-stack-TransitGatewayId
       VpcId: !Ref VPC
       SubnetIds:
-        - !Select [0, !GetAZs '']
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
       Tags:
         - Key: Name
           Value: VPCtoTGWAttachment
