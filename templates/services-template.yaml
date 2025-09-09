@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Deploys an Application Load Balancer (ALB) with an ECS Fargate backend service.
+Description: Deploys an Application Load Balancer (ALB) with ECS Fargate service, a VPC Lambda function with internet connectivity test, and a public API Gateway endpoint for Lambda. All networking resources are imported from the network stack.
 
 Resources:
+  # ALB Security Group: Allows inbound HTTP traffic to the ALB. VPC imported from network stack.
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -19,6 +20,7 @@ Resources:
         - Key: Name
           Value: ALBSecurityGroup
 
+  # ECS Security Group: Allows inbound traffic from ALB. VPC and ALB SG imported from network stack.
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -36,6 +38,7 @@ Resources:
         - Key: Name
           Value: ECSSecurityGroup
 
+  # Application Load Balancer: Internet-facing ALB. Subnets imported from network stack.
   ALB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -51,6 +54,7 @@ Resources:
         - Key: Name
           Value: ExampleALB
 
+  # ALB Listener: Listens for HTTP traffic and forwards to target group.
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -61,6 +65,7 @@ Resources:
       Port: 80
       Protocol: HTTP
 
+  # ALB Target Group: Forwards traffic to ECS tasks. VPC imported from network stack.
   ALBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -73,11 +78,13 @@ Resources:
       Matcher:
         HttpCode: 200
 
+  # ECS Cluster: Logical grouping for ECS services and tasks.
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: ExampleCluster
 
+  # ECS Task Execution Role: Allows ECS tasks to pull images and write logs.
   ECSServiceTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -94,6 +101,7 @@ Resources:
         - Key: Name
           Value: ECSServiceTaskExecutionRole
 
+  # ECS Task Role: Used by the application running in ECS tasks.
   ECSTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -110,6 +118,7 @@ Resources:
         - Key: Name
           Value: ECSTaskRole
 
+  # ECS Task Definition: Specifies container image and settings for ECS Fargate.
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -128,6 +137,7 @@ Resources:
           PortMappings:
             - ContainerPort: 80
 
+  # ECS Service: Runs and manages ECS tasks behind the ALB.
   ECSService:
     Type: AWS::ECS::Service
     DependsOn: ALBListener
@@ -150,7 +160,7 @@ Resources:
           TargetGroupArn: !Ref ALBTargetGroup
       ServiceName: ExampleECSService
 
-  # Lambda execution role for VPC Lambda
+  # Lambda Execution Role: Allows Lambda to create network interfaces in VPC.
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -178,7 +188,7 @@ Resources:
         - Key: Name
           Value: LambdaExecutionRole
 
-  # Security group for Lambda in VPC
+  # Lambda Security Group: Allows outbound HTTPS for Lambda internet test. VPC imported from network stack.
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -196,7 +206,7 @@ Resources:
         - Key: Name
           Value: LambdaSG
 
-  # Example Lambda function deployed in VPC mode
+  # Example Lambda Function: Makes an HTTP request to test internet access. Subnets imported from network stack.
   ExampleLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -229,13 +239,14 @@ Resources:
         - Key: Name
           Value: ExampleVpcLambda
 
-  # API Gateway REST API to expose Lambda function
+  # API Gateway REST API: Public endpoint to invoke Lambda function.
   LambdaApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: ExampleLambdaApi
       Description: Public API Gateway for ExampleVpcLambda
 
+  # API Gateway Resource: Defines /lambda path for the API.
   LambdaApiRootResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -243,6 +254,7 @@ Resources:
       ParentId: !GetAtt LambdaApi.RootResourceId
       PathPart: lambda
 
+  # API Gateway Method: GET /lambda invokes Lambda function.
   LambdaApiMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -256,6 +268,7 @@ Resources:
         Uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ExampleLambdaFunction.Arn}/invocations
 
+  # API Gateway Deployment: Deploys API to prod stage.
   LambdaApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn: LambdaApiMethod
@@ -263,6 +276,7 @@ Resources:
       RestApiId: !Ref LambdaApi
       StageName: prod
 
+  # Lambda Permission: Allows API Gateway to invoke Lambda function.
   LambdaApiInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:

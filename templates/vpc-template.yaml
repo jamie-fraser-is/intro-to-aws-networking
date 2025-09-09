@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
 Description: VPC with public/private subnets, IGW, NAT Gateway, route tables, VPC
-  endpoints, and a private hosted zone
+  endpoints, private hosted zone, and TGW attachment. Outputs are exported for
+  cross-stack references.
 
 Parameters:
   VpcCidr:
@@ -21,9 +22,7 @@ Parameters:
     Default: 10.0.102.0/24
   
 Resources:
-
-  ## Core VPC and networking components ##
-
+  # VPC: Main network container for all resources.
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -37,6 +36,7 @@ Resources:
     Metadata:
       Comment: Creates the main VPC with DNS support
 
+  # Internet Gateway: Enables public internet access for VPC.
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -46,6 +46,7 @@ Resources:
     Metadata:
       Comment: Creates an Internet Gateway for public internet access
 
+  # IGW Attachment: Attaches IGW to VPC.
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
@@ -56,6 +57,7 @@ Resources:
     Metadata:
       Comment: Attaches the Internet Gateway to the VPC
 
+  # Public Subnets: For resources needing public internet access.
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -92,6 +94,7 @@ Resources:
     Metadata:
       Comment: Creates the second public subnet in AZ2
 
+  # Private Subnets: For internal resources (ECS, Lambda, etc).
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
@@ -128,6 +131,7 @@ Resources:
     Metadata:
       Comment: Creates the second private subnet in AZ2
 
+  # Public Route Table: For public subnets.
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -139,6 +143,7 @@ Resources:
     Metadata:
       Comment: Creates a route table for public subnets
 
+  # Default Route to IGW for public subnets.
   PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
@@ -151,6 +156,7 @@ Resources:
     Metadata:
       Comment: Adds a default route to the Internet Gateway
 
+  # Route Table Associations for public subnets.
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -171,6 +177,7 @@ Resources:
     Metadata:
       Comment: Associates PublicSubnet2 with PublicRouteTable
 
+  # NAT Gateway EIP: Elastic IP for NAT Gateway.
   EIPNatGateway:
     Type: AWS::EC2::EIP
     DependsOn: AttachGateway
@@ -179,6 +186,7 @@ Resources:
     Metadata:
       Comment: Allocates an Elastic IP for the NAT Gateway
 
+  # NAT Gateway: Enables private subnets to access the internet.
   NatGateway:
     Type: AWS::EC2::NatGateway
     DependsOn: AttachGateway
@@ -195,6 +203,7 @@ Resources:
     Metadata:
       Comment: Creates a NAT Gateway for private subnet internet access
 
+  # Private Route Table: For private subnets.
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -206,6 +215,7 @@ Resources:
     Metadata:
       Comment: Creates a route table for private subnets
 
+  # Default Route to NAT Gateway for private subnets.
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
@@ -217,6 +227,7 @@ Resources:
     Metadata:
       Comment: Adds a default route to the NAT Gateway
 
+  # Route Table Associations for private subnets.
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -237,8 +248,7 @@ Resources:
     Metadata:
       Comment: Associates PrivateSubnet2 with PrivateRouteTable
 
-  ## VPC Endpoints for S3 and Lambda ##
-
+  # S3 VPC Endpoint: Private access to S3 from VPC.
   S3VPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -262,6 +272,7 @@ Resources:
     Metadata:
       Comment: Creates a gateway VPC endpoint for S3
 
+  # Lambda VPC Endpoint: Private access to Lambda from VPC.
   LambdaVPCEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -281,8 +292,7 @@ Resources:
     Metadata:
       Comment: Creates an interface VPC endpoint for Lambda
 
-  ## Example Network ACL for private subnets ##
-
+  # Private Subnet NACL: Controls traffic for private subnets.
   PrivateSubnetNACL:
     Type: AWS::EC2::NetworkAcl
     Properties:
@@ -293,6 +303,7 @@ Resources:
     Metadata:
       Comment: Example NACL for private subnets
 
+  # NACL Entries: Allow all inbound/outbound (demo only).
   PrivateSubnetNACLEntryInboundAllow:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
@@ -317,6 +328,7 @@ Resources:
     Metadata:
       Comment: Allow all outbound (example only, restrict in production)
 
+  # NACL Associations for private subnets.
   PrivateSubnet1NACLAssociation:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
@@ -333,8 +345,7 @@ Resources:
     Metadata:
       Comment: Associate NACL with PrivateSubnet2
 
-  ## Example Security Group for general use ##
-
+  # Example Security Group: For general use/testing.
   ExampleSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -348,8 +359,7 @@ Resources:
     Metadata:
       Comment: Placeholder for additional security group rules
 
-  ## Private Hosted Zone for internal DNS resolution ##
-
+  # Private Hosted Zone: Internal DNS for VPC.
   PrivateHostedZone:
     Type: AWS::Route53::HostedZone
     Properties:
@@ -362,11 +372,9 @@ Resources:
         VPCRegion:
           Ref: AWS::Region
     Metadata:
-      Comment: Creates a private hosted zone named 'networking.aws' and associates
-        it with the VPC
+      Comment: Creates a private hosted zone named 'networking.aws' and associates it with the VPC
 
-  ## Transit Gateway Attachment to connect VPC to TGW ##
-
+  # TGW Attachment: Connects VPC to Transit Gateway (imported from TGW stack).
   VPCTransitGatewayAttachment:
     Type: AWS::EC2::TransitGatewayAttachment
     Properties:
@@ -380,7 +388,6 @@ Resources:
           Value: VPCtoTGWAttachment
 
 Outputs:
-
   VPCId:
     Description: VPC ID
     Value: !Ref VPC
