@@ -1,9 +1,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Deploys an Application Load Balancer (ALB) with an ECS Fargate backend service.
 
-
-
 Resources:
+  PublicHostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      Name: isjaftraining.aws
+      HostedZoneConfig:
+        Comment: Public hosted zone for ALB domain
+      Tags:
+        - Key: Name
+          Value: PublicALBHostedZone
+
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -56,14 +64,24 @@ Resources:
   ALBCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
-      DomainName: !Sub "alb.${AWS::Region}.${AWS::StackName}.example.com"
+      DomainName: isjaftraining.aws
       ValidationMethod: DNS
       DomainValidationOptions:
-        - DomainName: !Sub "alb.${AWS::Region}.${AWS::StackName}.example.com"
-          HostedZoneId: "Z3AADJGX6KTTL2" # Example Hosted Zone ID for example.com (replace for real use)
+        - DomainName: isjaftraining.aws
+          HostedZoneId: !Ref PublicHostedZone
       Tags:
         - Key: Name
           Value: ALBCertificate
+
+  ALBCertificateValidationRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref PublicHostedZone
+      Name: !Select [0, !GetAtt ALBCertificate.DomainValidationOptions]
+      Type: CNAME
+      TTL: 300
+      ResourceRecords:
+        - !Select [1, !GetAtt ALBCertificate.DomainValidationOptions]
 
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
