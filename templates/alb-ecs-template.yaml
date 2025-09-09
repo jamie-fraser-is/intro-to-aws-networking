@@ -206,8 +206,14 @@ Resources:
       Runtime: python3.12
       Code:
         ZipFile: |
+          import urllib.request
           def handler(event, context):
-              return {"statusCode": 200, "body": "Hello from Lambda in VPC!"}
+              try:
+                  with urllib.request.urlopen('https://api.ipify.org') as response:
+                      ip = response.read().decode()
+                  return {"statusCode": 200, "body": f"Lambda public IP: {ip}"}
+              except Exception as e:
+                  return {"statusCode": 500, "body": f"Error: {str(e)}"}
       VpcConfig:
         SecurityGroupIds:
           - !Ref LambdaSecurityGroup
