@@ -47,12 +47,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: eu-west-2
 
-      - name: Simulate CloudFormation permissions
-        run: |
-          aws iam simulate-principal-policy \
-            --policy-source-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }} \
-            --action-names cloudformation:DescribeStacks
-
       - name: Deploy TGW stack (debug)
         run: |
           aws cloudformation deploy \
@@ -73,7 +67,7 @@ jobs:
       - name: Deploy ALB/ECS stack
         run: |
           aws cloudformation deploy \
-            --template-file templates/alb-ecs-template.yaml \
-            --stack-name alb-ecs-stack \
+            --template-file templates/services-template.yaml \
+            --stack-name services-stack \
             --capabilities CAPABILITY_NAMED_IAM \
             --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}

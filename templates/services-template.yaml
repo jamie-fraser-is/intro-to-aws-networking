@@ -1,0 +1,323 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploys an Application Load Balancer (ALB) with ECS Fargate service, a VPC Lambda function with internet connectivity test, and a public API Gateway endpoint for Lambda. All networking resources are imported from the network stack.
+
+Resources:
+  # ALB Security Group: Allows inbound HTTP traffic to the ALB. VPC imported from network stack.
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ALB (HTTP only)
+      VpcId: !ImportValue network-stack-VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ALBSecurityGroup
+
+  # ECS Security Group: Allows inbound traffic from ALB. VPC and ALB SG imported from network stack.
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for ECS tasks
+      VpcId: !ImportValue network-stack-VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ECSSecurityGroup
+
+  # Application Load Balancer: Internet-facing ALB. Subnets imported from network stack.
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: ExampleALB
+      Scheme: internet-facing
+      Subnets:
+        - !ImportValue network-stack-PublicSubnet1Id
+        - !ImportValue network-stack-PublicSubnet2Id
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Type: application
+      Tags:
+        - Key: Name
+          Value: ExampleALB
+
+  # ALB Listener: Listens for HTTP traffic and forwards to target group.
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+
+  # ALB Target Group: Forwards traffic to ECS tasks. VPC imported from network stack.
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: ExampleTargetGroup
+      Port: 80
+      Protocol: HTTP
+      VpcId: !ImportValue network-stack-VPCId
+      TargetType: ip
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+
+  # ECS Cluster: Logical grouping for ECS services and tasks.
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: ExampleCluster
+
+  # ECS Task Execution Role: Allows ECS tasks to pull images and write logs.
+  ECSServiceTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: ECSServiceTaskExecutionRole
+
+  # ECS Task Role: Used by the application running in ECS tasks.
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: ECSTaskRole
+
+  # ECS Task Definition: Specifies container image and settings for ECS Fargate.
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: example-task
+      Cpu: '256'
+      Memory: '512'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt ECSServiceTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: app
+          Image: nginx:latest
+          Essential: true
+          PortMappings:
+            - ContainerPort: 80
+
+  # ECS Service: Runs and manages ECS tasks behind the ALB.
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: ALBListener
+    Properties:
+      Cluster: !Ref ECSCluster
+      DesiredCount: 1
+      LaunchType: FARGATE
+      TaskDefinition: !Ref ECSTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !ImportValue network-stack-PrivateSubnet1Id
+            - !ImportValue network-stack-PrivateSubnet2Id
+      LoadBalancers:
+        - ContainerName: app
+          ContainerPort: 80
+          TargetGroupArn: !Ref ALBTargetGroup
+      ServiceName: ExampleECSService
+
+  # Lambda Execution Role: Allows Lambda to create network interfaces in VPC.
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: LambdaVPCAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateNetworkInterface
+                  - ec2:DescribeNetworkInterfaces
+                  - ec2:DeleteNetworkInterface
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: LambdaExecutionRole
+
+  # Lambda Security Group: Allows outbound HTTPS for Lambda internet test. VPC imported from network stack.
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Lambda in VPC
+      VpcId: !ImportValue network-stack-VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: LambdaSG
+
+  # Example Lambda Function: Makes an HTTP request to test internet access. Subnets imported from network stack.
+  ExampleLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ExampleVpcLambda
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.12
+      Code:
+        ZipFile: |
+          import urllib.request
+          def handler(event, context):
+              try:
+                  with urllib.request.urlopen('https://api.ipify.org') as response:
+                      ip = response.read().decode()
+                  return {"statusCode": 200, "body": f"Lambda public IP: {ip}"}
+              except Exception as e:
+                  return {"statusCode": 500, "body": f"Error: {str(e)}"}
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroup
+        SubnetIds:
+          - !ImportValue network-stack-PrivateSubnet1Id
+          - !ImportValue network-stack-PrivateSubnet2Id
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          EXAMPLE: "true"
+      Tags:
+        - Key: Name
+          Value: ExampleVpcLambda
+
+  # API Gateway REST API: Public endpoint to invoke Lambda function.
+  LambdaApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ExampleLambdaApi
+      Description: Public API Gateway for ExampleVpcLambda
+
+  # API Gateway Resource: Defines /lambda path for the API.
+  LambdaApiRootResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref LambdaApi
+      ParentId: !GetAtt LambdaApi.RootResourceId
+      PathPart: lambda
+
+  # API Gateway Method: GET /lambda invokes Lambda function.
+  LambdaApiMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref LambdaApi
+      ResourceId: !Ref LambdaApiRootResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ExampleLambdaFunction.Arn}/invocations
+
+  # API Gateway Deployment: Deploys API to prod stage.
+  LambdaApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: LambdaApiMethod
+    Properties:
+      RestApiId: !Ref LambdaApi
+      StageName: prod
+
+  # Lambda Permission: Allows API Gateway to invoke Lambda function.
+  LambdaApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ExampleLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${LambdaApi}/*/*/lambda
+
+Outputs:
+  ALBEndpoint:
+    Description: DNS name of the Application Load Balancer
+    Value: !GetAtt ALB.DNSName
+  ALBSecurityGroupId:
+    Description: Security group ID for the ALB
+    Value: !Ref ALBSecurityGroup
+  ECSClusterName:
+    Description: Name of the ECS Cluster
+    Value: !Ref ECSCluster
+  ECSClusterArn:
+    Description: ARN of the ECS Cluster
+    Value: !GetAtt ECSCluster.Arn
+  ECSServiceName:
+    Description: Name of the ECS Service
+    Value: !Ref ECSService
+  ECSServiceTaskExecutionRoleArn:
+    Description: ARN of the ECS Task Execution Role
+    Value: !GetAtt ECSServiceTaskExecutionRole.Arn
+  ECSTaskRoleArn:
+    Description: ARN of the ECS Task Role
+    Value: !GetAtt ECSTaskRole.Arn
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref ExampleLambdaFunction
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt ExampleLambdaFunction.Arn
+  LambdaSecurityGroupId:
+    Description: Security group ID for Lambda
+    Value: !Ref LambdaSecurityGroup
+  LambdaApiInvokeUrl:
+    Description: Invoke URL for the Lambda API Gateway endpoint
+    Value:
+      Fn::Sub: https://${LambdaApi}.execute-api.${AWS::Region}.amazonaws.com/prod/lambda
