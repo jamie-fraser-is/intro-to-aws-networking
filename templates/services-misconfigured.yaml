@@ -322,6 +322,19 @@ Resources:
         - Key: Name
           Value: MisconfiguredRouteTable
 
+  # Associate misconfigured route table with private subnets
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !ImportValue network-stack-PrivateSubnet1Id
+      RouteTableId: !Ref MisconfiguredRouteTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !ImportValue network-stack-PrivateSubnet2Id
+      RouteTableId: !Ref MisconfiguredRouteTable
+
 Outputs:
   ALBEndpoint:
     Description: DNS name of the Application Load Balancer
