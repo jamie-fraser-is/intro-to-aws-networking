@@ -387,6 +387,40 @@ Resources:
         - Key: Name
           Value: VPCtoTGWAttachment
 
+  # VPC Flow Log: Logs all network traffic in the VPC.
+  FlowLogsIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: vpc-flow-logs.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: FlowLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  # VPC Flow Log: Captures all traffic (for demo; filter in production)
+  VPCFlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      DeliverLogsPermissionArn: !GetAtt FlowLogsIAMRole.Arn
+      LogDestinationType: cloud-watch-logs
+      ResourceId: !Ref VPC
+      ResourceType: VPC
+      TrafficType: ALL
+
 Outputs:
   VPCId:
     Description: VPC ID
