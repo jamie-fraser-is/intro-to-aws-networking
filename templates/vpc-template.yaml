@@ -457,3 +457,10 @@ Outputs:
   NatGatewayId:
     Description: NAT Gateway ID
     Value: !Ref NatGateway
+
+  S3VPCEndpointId:
+    Description: VPC Endpoint ID for S3
+    Value: !Ref S3VPCEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-S3VPCEndpointId"
+

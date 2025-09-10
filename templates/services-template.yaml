@@ -169,6 +169,35 @@ Resources:
         - Key: Name
           Value: LambdaOutputBucket
 
+  # S3 Bucket Policy: Restricts access to the bucket to only the VPC Endpoint.
+  LambdaOutputBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LambdaOutputBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyNonVPCEWriteAccess
+            Effect: Deny
+            Principal: "*"
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource:
+              - !Sub "arn:aws:s3:::${AWS::StackName}-lambda-output/*"
+            Condition:
+              StringNotEquals:
+                aws:sourceVpce: !ImportValue network-stack-S3VPCEndpointId
+          - Sid: AllowAllReadAccess
+            Effect: Allow
+            Principal: "*"
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub "arn:aws:s3:::${AWS::StackName}-lambda-output"
+              - !Sub "arn:aws:s3:::${AWS::StackName}-lambda-output/*"
+
   # Lambda Execution Role: Allows Lambda to create network interfaces in VPC and write to S3 bucket.
   LambdaExecutionRole:
     Type: AWS::IAM::Role
