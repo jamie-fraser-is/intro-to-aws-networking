@@ -164,7 +164,12 @@ Resources:
   LambdaOutputBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${AWS::StackName}-lambda-output'
+      BucketName: !Sub "${AWS::StackName}-lambda-output"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
       Tags:
         - Key: Name
           Value: LambdaOutputBucket
