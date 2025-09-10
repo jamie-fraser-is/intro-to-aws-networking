@@ -417,9 +417,11 @@ Resources:
     Properties:
       DeliverLogsPermissionArn: !GetAtt FlowLogsIAMRole.Arn
       LogDestinationType: cloud-watch-logs
+      LogGroupName: !Sub "/aws/vpc/flowlogs/${VPC}"
       ResourceId: !Ref VPC
       ResourceType: VPC
       TrafficType: ALL
+
 
 Outputs:
   VPCId:
