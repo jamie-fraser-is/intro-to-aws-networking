@@ -67,7 +67,7 @@ jobs:
       - name: Deploy ALB/ECS stack
         run: |
           aws cloudformation deploy \
-            --template-file templates/services-template.yaml \
-            --stack-name services-stack \
+            --template-file templates/services-misconfigured-template.yaml \
+            --stack-name services-misconfigured-stack \
             --capabilities CAPABILITY_NAMED_IAM \
             --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
