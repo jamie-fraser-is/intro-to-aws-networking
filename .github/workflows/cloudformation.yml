@@ -68,6 +68,6 @@ jobs:
         run: |
           aws cloudformation deploy \
             --template-file templates/services-template.yaml \
-            --stack-name services-misconfigured-stack \
+            --stack-name services-stack \
             --capabilities CAPABILITY_NAMED_IAM \
             --role-arn ${{ secrets.AWS_CLOUDFORMATION_ROLE_ARN }}
