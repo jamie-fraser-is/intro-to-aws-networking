@@ -222,27 +222,22 @@ The `services-misconfigured.yaml` template is designed for learning and troubles
 2. Find the security group named `LambdaSG`.
 3. Edit **Inbound/Outbound rules** as needed for your scenario.
 
-## 4. Route Table: Missing NAT Gateway Route for Private Subnets
-**Misconfiguration:** The route table for private subnets is missing a route to the NAT Gateway, so resources (like Lambda) cannot access the internet.
+## 4. Route Table: Missing NAT Gateway and S3 VPC Endpoint Routes for Private Subnets
+**Misconfiguration:** The route table for private subnets is missing a route to the NAT Gateway (for internet access) and a route to the S3 VPC endpoint (for private S3 access).
 
 **How to Fix in Console:**
 1. Go to **VPC > Route Tables**.
-2. Find the route table named `MisconfiguredRouteTable` (or the one associated with your private subnets).
+2. Find the route table named `MisconfiguredRouteTable` (associated with your private subnets).
 3. Edit routes and add:
-   - Destination: `0.0.0.0/0`
-   - Target: NAT Gateway (select the correct NAT Gateway for your VPC)
-4. Save the route.
+   - **Internet Access:**
+     - Destination: `0.0.0.0/0`
+     - Target: NAT Gateway (select the correct NAT Gateway for your VPC)
+   - **S3 VPC Endpoint Access:**
+     - Destination: `pl-xxxxxxxx` (prefix list for S3, e.g., `pl-<S3PrefixListId>`)
+     - Target: VPC Endpoint (select the correct S3 endpoint for your VPC)
+4. Save the routes.
 
-## 5. NACL: Overly Restrictive, Blocks All Traffic
-**Misconfiguration:** The NACL associated with subnets is set to deny all inbound and outbound traffic.
-
-**How to Fix in Console:**
-1. Go to **VPC > Network ACLs**.
-2. Find the NACL named `MisconfiguredNACL`.
-3. Edit inbound and outbound rules:
-   - Remove or modify the rules that deny all traffic.
-   - Add rules to allow required traffic (e.g., allow HTTP/HTTPS, ephemeral ports, etc.)
-4. Save the changes.
+> You can find the S3 prefix list ID in the AWS Console under **VPC > Prefix Lists** or in the S3 VPC endpoint details.
 
 ---
 
