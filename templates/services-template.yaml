@@ -160,7 +160,16 @@ Resources:
           TargetGroupArn: !Ref ALBTargetGroup
       ServiceName: ExampleECSService
 
-  # Lambda Execution Role: Allows Lambda to create network interfaces in VPC.
+  # S3 Bucket for Lambda output
+  LambdaOutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-lambda-output'
+      Tags:
+        - Key: Name
+          Value: LambdaOutputBucket
+
+  # Lambda Execution Role: Allows Lambda to create network interfaces in VPC and write to S3 bucket.
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -184,6 +193,14 @@ Resources:
                   - ec2:DescribeNetworkInterfaces
                   - ec2:DeleteNetworkInterface
                 Resource: '*'
+        - PolicyName: LambdaS3WriteAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub '${LambdaOutputBucket.Arn}/*'
       Tags:
         - Key: Name
           Value: LambdaExecutionRole
@@ -206,7 +223,7 @@ Resources:
         - Key: Name
           Value: LambdaSG
 
-  # Example Lambda Function: Makes an HTTP request to test internet access. Subnets imported from network stack.
+  # Example Lambda Function: Makes an HTTP request to test internet access and writes result to S3 bucket.
   ExampleLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -217,11 +234,21 @@ Resources:
       Code:
         ZipFile: |
           import urllib.request
+          import boto3
+          import os
           def handler(event, context):
+              bucket = os.environ.get('OUTPUT_BUCKET')
+              s3 = boto3.client('s3')
               try:
                   with urllib.request.urlopen('https://api.ipify.org') as response:
                       ip = response.read().decode()
-                  return {"statusCode": 200, "body": f"Lambda public IP: {ip}"}
+                  # Write result to S3
+                  s3.put_object(
+                      Bucket=bucket,
+                      Key='lambda-ip.txt',
+                      Body=f'Lambda public IP: {ip}'
+                  )
+                  return {"statusCode": 200, "body": f"Lambda public IP: {ip} (also written to S3)"}
               except Exception as e:
                   return {"statusCode": 500, "body": f"Error: {str(e)}"}
       VpcConfig:
@@ -235,6 +262,7 @@ Resources:
       Environment:
         Variables:
           EXAMPLE: "true"
+          OUTPUT_BUCKET: !Ref LambdaOutputBucket
       Tags:
         - Key: Name
           Value: ExampleVpcLambda
@@ -321,3 +349,6 @@ Outputs:
     Description: Invoke URL for the Lambda API Gateway endpoint
     Value:
       Fn::Sub: https://${LambdaApi}.execute-api.${AWS::Region}.amazonaws.com/prod/lambda
+  LambdaOutputBucketName:
+    Description: Name of the S3 bucket for Lambda output
+    Value: !Ref LambdaOutputBucket
